@@ -65,16 +65,24 @@ uses
 
 const
   WinSparkleLib = 'WinSparkle.dll';
-  WinSprkaleVersion = '0.5.3';
+  WinSparkleVersion = '0.6.0';
 
   MajorVersion = '1';
-  MinorVersion = '1';
+  MinorVersion = '2';
   BugVersion = '0';
 
 //***************************************************************
 //
 // Version History
 //
+//
+// 1.2.0 - 03/02/2018
+//
+// ** Improvement
+//
+//    * Manage DSA Certificates (Many Thanks to gliden)
+//    * WinSparkle version: 0.6.0
+//    * Clean up code
 //
 // 1.1.0 - 15/01/2017 - (Win32, Win64)
 //
@@ -126,7 +134,7 @@ type
     fOnUpdateCancelled: TProc;
 
     fOnCanShutDown: TFunc<Boolean>;
-    fDsaPublicPem: String;
+    fDSAPublicPem: String;
 
     function getDLLLoaded: Boolean;
     procedure ExecuteSimpleProcedure(const procName: PWideChar);
@@ -158,7 +166,7 @@ type
     procedure SetOnDidNotFindUpdate (const newProc: TProc);
     procedure SetOnUpdateCancelled (const newProc: TProc);
     procedure SetOnCanShutDown (const newFunc: TFunc<Boolean>);
-    procedure SetDsaPublicPem(const Value: String);
+    procedure setDSAPublicPem(const Value: String);
 
   public
     constructor Create; overload;
@@ -313,7 +321,7 @@ type
     property RegistryPath: string read GetRegistryPath write SetRegistryPath;
     property UpdateCheckInterval: integer read GetUpdateCheckInterval
       write SetUpdateCheckInterval;
-    property DsaPublicPem: String read fDsaPublicPem write SetDsaPublicPem;
+    property DSAPublicPem: String read fDSAPublicPem write setDSAPublicPem;
     {$REGION 'This event is triggered when WinSparkle gets an error while it is attempting to check for updates.'}
     /// <summary>
     ///   This event is triggered when WinSparkle gets an error while it is
@@ -356,7 +364,7 @@ type
 implementation
 
 uses
-  System.DateUtils, Winapi.Windows;
+  System.DateUtils, Winapi.Windows, System.IOUtils;
 
 ////
 /// This variable and the DoProcedure(s) are used to trigger the
@@ -475,9 +483,15 @@ begin
 end;
 
 constructor TneSparkle.Create(const newPath: string);
+var
+  fullFilename: string;
 begin
-  fDLLPath:=newPath;
-  fHandle:=SafeLoadLibrary(fDLLPath+WinSparkleLib);
+  if Trim(newPath)='' then
+    fullFilename:=WinSparkleLib
+  else
+    fullFilename:=TPath.Combine(Trim(newPath), WinSparkleLib);
+  fDLLPath:=Trim(newPath);
+  fHandle:=SafeLoadLibrary(fullFilename);
 end;
 
 destructor TneSparkle.Destroy;
@@ -698,23 +712,24 @@ begin
 end;
 
 
-procedure TneSparkle.SetDsaPublicPem(const Value: String);
+procedure TneSparkle.setDSAPublicPem(const Value: String);
 var
-  p: Pointer;
   tmpProc: function (pem: PAnsiChar): Integer; cdecl;
   res: Integer;
 begin
-  if not getDLLLoaded then Exit;
-
+  if not getDLLLoaded then
+    Exit;
   res := 0;
-  tmpProc:=GetProcAddress(fHandle, 'win_sparkle_set_dsa_pub_pem');
-  if Assigned(tmpProc) then res := tmpProc(PAnsiChar(AnsiString(value)));
+  @tmpProc:=GetProcAddress(fHandle, 'win_sparkle_set_dsa_pub_pem');
+  if Assigned(tmpProc) then
+    res := tmpProc(PAnsiChar(AnsiString(value)));
   if res = 1 then
   begin
-    fDsaPublicPem := Value;
-  end else
+    fDSAPublicPem := Value;
+  end
+  else
   begin
-    fDsaPublicPem := '';
+    fDSAPublicPem := '';
   end;
 end;
 
